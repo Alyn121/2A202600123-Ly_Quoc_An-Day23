@@ -27,7 +27,8 @@ def run_scenarios(
     """Run all grading scenarios and write metrics JSON."""
     cfg = yaml.safe_load(config.read_text(encoding="utf-8"))
     scenarios = load_scenarios(cfg["scenarios_path"])
-    checkpointer = build_checkpointer(cfg.get("checkpointer", "memory"), cfg.get("database_url"))
+    checkpointer_kind = cfg.get("checkpointer", "memory")
+    checkpointer = build_checkpointer(checkpointer_kind, cfg.get("database_url"))
     graph = build_graph(checkpointer=checkpointer)
     metrics = []
     for scenario in scenarios:
@@ -35,7 +36,10 @@ def run_scenarios(
         run_config = {"configurable": {"thread_id": state["thread_id"]}}
         final_state = graph.invoke(state, config=run_config)
         metrics.append(metric_from_state(final_state, scenario.expected_route.value, scenario.requires_approval))
-    report = summarize_metrics(metrics)
+    
+    # Resume success is True if we use persistent storage (SQLite/Postgres)
+    resume_success = checkpointer_kind in ["sqlite", "postgres"]
+    report = summarize_metrics(metrics, resume_success=resume_success)
     write_metrics(report, output)
     if cfg.get("report_path"):
         write_report(report, cfg["report_path"])

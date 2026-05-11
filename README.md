@@ -106,6 +106,10 @@ pip install -e '.[dev]'
 
 # Verify setup
 make test
+
+# Run Streamlit UI (Bonus Extension)
+pip install -e '.[ui]'
+streamlit run app.py
 ```
 
 `pip install -e '.[dev]'` installs this project in editable mode with dev dependencies (pytest, ruff, mypy). Editable mode means code changes take effect immediately without reinstalling.

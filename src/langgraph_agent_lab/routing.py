@@ -8,7 +8,8 @@ from .state import AgentState, Route
 def route_after_classify(state: AgentState) -> str:
     """Map classified route to the next graph node.
 
-    TODO(student): handle unknown routes safely and update tests for edge cases.
+    Uses route value from classify_node to determine next step.
+    Falls back safely to "answer" for unknown routes.
     """
     route = state.get("route", Route.SIMPLE.value)
     mapping = {
@@ -18,34 +19,57 @@ def route_after_classify(state: AgentState) -> str:
         Route.RISKY.value: "risky_action",
         Route.ERROR.value: "retry",
     }
-    return mapping.get(route, "answer")
+    # Safe fallback to answer node for unknown routes
+    next_node = mapping.get(route, "answer")
+    return next_node
 
 
 def route_after_retry(state: AgentState) -> str:
-    """Decide whether to retry, fallback, or dead-letter.
+    """Decide whether to retry tool or escalate to dead-letter.
 
-    TODO(student): implement bounded retry and dead-letter routing.
+    Implements bounded retry: if attempt >= max_attempts, route to dead_letter.
+    Otherwise, return to tool for another attempt.
     """
-    if int(state.get("attempt", 0)) >= int(state.get("max_attempts", 3)):
+    attempt = int(state.get("attempt", 0))
+    max_attempts = int(state.get("max_attempts", 3))
+    
+    if attempt >= max_attempts:
+        # Max retries exhausted, escalate to dead letter
         return "dead_letter"
+    
+    # Continue retrying
     return "tool"
 
 
 def route_after_evaluate(state: AgentState) -> str:
     """Decide whether tool result is satisfactory or needs retry.
 
-    This is the 'done?' check that enables retry loops — a key LangGraph advantage over LCEL.
-    TODO(student): replace heuristic with LLM-as-judge or structured validation.
+    This is the critical 'done?' gate that enables retry loops.
+    If evaluation_result is "needs_retry", route back to retry node.
+    Otherwise, proceed to answer node.
     """
-    if state.get("evaluation_result") == "needs_retry":
+    evaluation = state.get("evaluation_result", "success")
+    
+    if evaluation == "needs_retry":
+        # Tool result not satisfactory, route to retry
         return "retry"
+    
+    # Tool result satisfactory, proceed to answer
     return "answer"
 
 
 def route_after_approval(state: AgentState) -> str:
-    """Continue only if approved.
+    """Route based on approval decision for risky actions.
 
-    TODO(student): support reject/edit outcomes.
+    If approved, proceed to tool evaluation.
+    If rejected, route to clarify (safe fallback) rather than executing risky action.
     """
     approval = state.get("approval") or {}
-    return "tool" if approval.get("approved") else "clarify"
+    approved = approval.get("approved", False)
+    
+    if approved:
+        # Approval granted, proceed to tool
+        return "tool"
+    else:
+        # Approval denied, ask for clarification instead of executing risky action
+        return "clarify"

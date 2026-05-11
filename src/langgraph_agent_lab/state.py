@@ -5,14 +5,14 @@ Students should extend the schema only when needed. Keep state lean and serializ
 
 from __future__ import annotations
 
-from enum import StrEnum
+from enum import Enum
 from typing import Annotated, Any, TypedDict
 
 from operator import add
 from pydantic import BaseModel, Field, field_validator
 
 
-class Route(StrEnum):
+class Route(str, Enum):
     SIMPLE = "simple"
     TOOL = "tool"
     MISSING_INFO = "missing_info"
@@ -39,10 +39,22 @@ class ApprovalDecision(BaseModel):
 
 
 class AgentState(TypedDict, total=False):
-    """LangGraph state.
+    """LangGraph state with explicit append-only vs overwrite fields.
 
-    TODO(student): decide which fields should be append-only and which should be overwritten.
-    The current annotations give a safe starting point for auditability.
+    Append-only fields (Annotated[list, add]):
+    - messages: conversation history
+    - tool_results: tool execution results
+    - errors: error log
+    - events: audit trail of node execution
+
+    Overwrite fields (current state):
+    - thread_id, scenario_id, query: request metadata
+    - route: current routing decision
+    - risk_level: risk classification
+    - attempt, max_attempts: retry tracking
+    - final_answer, pending_question, proposed_action: current outputs
+    - approval: approval decision record
+    - evaluation_result: tool result evaluation ("success" or "needs_retry")
     """
 
     thread_id: str
